@@ -9,6 +9,7 @@ RANDOM_CHARSET = string.ascii_lowercase+string.digits+string.ascii_uppercase
 FORM_BOUNDARY = "----geckoformboundary_strawberrywashere_"
 FORM_BOUNDARY += ''.join(random.sample(RANDOM_CHARSET,6))
 FORM_SEP = f"--{FORM_BOUNDARY}\r\nContent-Disposition: form-data; name="
+HANDROLL = False
 with open("session.json") as session_file:
     session_cookies = json.load(session_file)
 if True:
@@ -43,17 +44,17 @@ elif len(sys.argv) > 1:
 else:
     imagePath = "multipart_constructed.png"
     logPath = "devlog.txt"
-    
+FORM_ENTRIES = {}    
 requestContent = ""
+imageFile = b""
 def prep_req(authenticity,imagePath="multipart_constructed.png",devlogText="(this is a test devlog) if you're seeing this, i fiddled around with multipart forms enough to get this devlog submitted"):
-    global requestContent, s_devlog
+    global requestContent, s_devlog, FORM_ENTRIES, imageFile
     imageFile = b""
     with open(imagePath,"rb") as file:
         imageFile = file.read()
     imageExt = os.path.splitext(imagePath)[1]
     imageName = os.path.basename(imagePath)
     print(imageName)
-    requestContent = ""
     FORM_ENTRIES = {"authenticity_token": authenticity,
                     "devlog[use_hackatime]":"true",
                     "devlog[text]": devlogText,
@@ -61,15 +62,20 @@ def prep_req(authenticity,imagePath="multipart_constructed.png",devlogText="(thi
                     "devlog[project_id]": PROJECT_ID,
                     "button": ""}
     #[2:-1] removes the b'' mark from conversion to text
-    for key,value in FORM_ENTRIES.items():
-        if key == "devlog[file]":
-            imgInsert = f"; filename=\"{imageName}\"\r\nContent-Type: image/{imageExt[1:]}"
-            #slicing the first character removes the dot
-        else:
-            imgInsert = ""
-        requestContent += f"{FORM_SEP}\"{key}\"{imgInsert}\r\n\r\n{value}\r\n"
-    requestContent += f"--{FORM_BOUNDARY}--"
-    #print(requestContent)
+    if HANDROLL:
+        requestContent = ""
+        for key,value in FORM_ENTRIES.items():
+            if key == "devlog[file]":
+                imgInsert = f"; filename=\"{imageName}\"\r\nContent-Type: image/{imageExt[1:]}"
+                #slicing the first character removes the dot
+            else:
+                imgInsert = ""
+            requestContent += f"{FORM_SEP}\"{key}\"{imgInsert}\r\n\r\n{value}\r\n"
+        requestContent += f"--{FORM_BOUNDARY}--"
+        #print(requestContent)
+    else:
+        del FORM_ENTRIES["devlog[file]"]
+
     s_devlog.headers.update({"Host":"summer.hackclub.com",
                             "User-Agent": USERAGENT,
                             "Accept":"text/vnd.turbo-stream.html, text/html, application/xhtml+xml",
@@ -77,7 +83,6 @@ def prep_req(authenticity,imagePath="multipart_constructed.png",devlogText="(thi
                             "Accept-Encoding": "gzip, deflate, br, zstd",
                             "Referer":f"{PROJECT_PREFIX}{PROJECT_ID}",
                             "x-turbo-request-id": "7a84b0c5-7899-4604-8e81-52a12d230156",
-                            "Content-Type": f"multipart/form-data; boundary={FORM_BOUNDARY}",
                             "Origin": "https://summer.hackclub.com",
                             "Sec-GPC": "1",
                             "Connection":"keep-alive",
@@ -86,18 +91,40 @@ def prep_req(authenticity,imagePath="multipart_constructed.png",devlogText="(thi
                             "Sec-Fetch-Site": "same-origin",
                             "Priority": "u=0",
                             "TE": "trailers"})
-def devlog_post(csrf=csrfToken,content=requestContent):
-    postData = {"mimeType": f"multipart/form-data; boundary={FORM_BOUNDARY}",
-                "params":[],
-                "text": content}
-    res = s_devlog.post(f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=postData, headers={"x-csrf-token":f"{csrf}"})
+def devlog_post(csrf=csrfToken,content=FORM_ENTRIES):
+    #postData = {"mimeType": f"multipart/form-data; boundary={FORM_BOUNDARY}",
+    #            "params":[],
+    #            "text": content}
+    if True:
+        req = r.Request("POST",f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=content,files={"devlog[file]": imageFile},headers={"x-csrf-token": f"{csrf}"})
+        print(req.headers)
+        print("^^ OG headers")
+        prepared_req = s_devlog.prepare_request(req)
+        #print(prepared_req.headers)
+        try:
+            print("body:")
+            #print(prepared_req.body[:400])
+        except Exception as _:
+            print(f"weh {_}")
+        res = s_devlog.send(prepared_req, timeout=15)
+    else:
+        res = s_devlog.post(f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=postData, headers={"x-csrf-token":f"{csrf}"})
+    
     return res
 
 if __name__ == "__main__":
     get_tokens()
-    with open(logPath) as file:
-        logText = file.read()
-    prep_req(authenticity, devlogText=f"{logText}")
-    resp = devlog_post()
-    print(resp.content)
+    #with open(logPath) as file:
+        #logText = file.read()
+    #prep_req(authenticity, devlogText=f"{logText}")
+    prep_req(authenticity)
+    #print(requestContent[:200])
+    print("=== devlog_post ===")
+    print(FORM_ENTRIES)
+    resp = devlog_post(csrf=csrfToken,content=FORM_ENTRIES)
+    print("=== response ===")
+    print(f"content: {resp.content}")
+    print(resp.text)
+    print(f"repr {repr(resp.content)}")
     print(resp.status_code)
+    print(resp.headers)

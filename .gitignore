@@ -2,3 +2,6 @@ session.json
 csrf_token.png
 multipart_constructed.png
 __pycache__/
+build/
+*.spec
+_internal /
