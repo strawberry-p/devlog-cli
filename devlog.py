@@ -1,6 +1,6 @@
 import requests as r
 from bs4 import BeautifulSoup
-import json
+import json, argparse
 import sys, os, random, string
 PROJECT_ID = "13052"
 PROJECT_PREFIX = "https://summer.hackclub.com/projects/"
@@ -10,6 +10,19 @@ FORM_BOUNDARY = "----geckoformboundary_strawberrywashere_"
 FORM_BOUNDARY += ''.join(random.sample(RANDOM_CHARSET,6))
 FORM_SEP = f"--{FORM_BOUNDARY}\r\nContent-Disposition: form-data; name="
 HANDROLL = False
+parser = argparse.ArgumentParser(description="Post Summer of Making devlogs from the CLI")
+parser.add_argument("PROJECT_ID")
+parser.add_argument("imagePath",help="path to image file from the working dir",type=str)
+parser.add_argument("-d","--devlog-file",default=False,help="path to text file to post as devlog from the working dir")
+parser.add_argument("-k","--keep-name",action="store_true",help="do not rename devlog image")
+args = parser.parse_args()
+PROJECT_ID = args.PROJECT_ID
+imagePath = args.imagePath
+if not args.devlog_file:
+    devText = input("write a devlog")
+else:
+    with open(args.devlog_file,"rt") as file:
+        devText = file.read()
 with open("session.json") as session_file:
     session_cookies = json.load(session_file)
 if True:
@@ -35,25 +48,19 @@ def get_tokens():
     return((authenticity, csrfToken))
 s_devlog = r.Session()
 s_devlog.headers.update({"Cookie": cookie}) #can't add the authenticity csrf token, it might change
-if len(sys.argv) > 2:
-    imagePath = sys.argv[2]
-    logPath = sys.argv[1]
-elif len(sys.argv) > 1:
-    imagePath = "multipart_constructed.png" #testing placeholder image
-    logPath = sys.argv[1]
-else:
-    imagePath = "multipart_constructed.png"
-    logPath = "devlog.txt"
 FORM_ENTRIES = {}    
 requestContent = ""
 imageFile = b""
-def prep_req(authenticity,imagePath="multipart_constructed.png",devlogText="(this is a test devlog) if you're seeing this, i fiddled around with multipart forms enough to get this devlog submitted"):
-    global requestContent, s_devlog, FORM_ENTRIES, imageFile
+imageName = f"devlog_{PROJECT_ID}_{''.join(random.sample(RANDOM_CHARSET,8))}"
+imageExt = ""
+def prep_req(authenticity,imagePath,devlogText):
+    global requestContent, s_devlog, FORM_ENTRIES, imageFile, imageName, imageExt
     imageFile = b""
     with open(imagePath,"rb") as file:
         imageFile = file.read()
-    imageExt = os.path.splitext(imagePath)[1]
-    imageName = os.path.basename(imagePath)
+    imageExt = os.path.splitext(imagePath)[1][1:]
+    if args.keep_name:
+        imageName = os.path.basename(imagePath)
     print(imageName)
     FORM_ENTRIES = {"authenticity_token": authenticity,
                     "devlog[use_hackatime]":"true",
@@ -66,7 +73,7 @@ def prep_req(authenticity,imagePath="multipart_constructed.png",devlogText="(thi
         requestContent = ""
         for key,value in FORM_ENTRIES.items():
             if key == "devlog[file]":
-                imgInsert = f"; filename=\"{imageName}\"\r\nContent-Type: image/{imageExt[1:]}"
+                imgInsert = f"; filename=\"{imageName}\"\r\nContent-Type: image/{imageExt}"
                 #slicing the first character removes the dot
             else:
                 imgInsert = ""
@@ -95,8 +102,12 @@ def devlog_post(csrf=csrfToken,content=FORM_ENTRIES):
     #postData = {"mimeType": f"multipart/form-data; boundary={FORM_BOUNDARY}",
     #            "params":[],
     #            "text": content}
+    if (imageExt) and (imageExt != ""):
+        fileTuple = (imageName,imageFile,f"image/{imageExt}")
+    else:
+        fileTuple = (imageName,imageFile)
     if True:
-        req = r.Request("POST",f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=content,files={"devlog[file]": imageFile},headers={"x-csrf-token": f"{csrf}"})
+        req = r.Request("POST",f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=content,files={"devlog[file]": fileTuple},headers={"x-csrf-token": f"{csrf}"})
         print(req.headers)
         print("^^ OG headers")
         prepared_req = s_devlog.prepare_request(req)
@@ -106,9 +117,9 @@ def devlog_post(csrf=csrfToken,content=FORM_ENTRIES):
             #print(prepared_req.body[:400])
         except Exception as _:
             print(f"weh {_}")
-        res = s_devlog.send(prepared_req, timeout=15)
+        res = s_devlog.send(prepared_req, timeout=10, allow_redirects=False)
     else:
-        res = s_devlog.post(f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=postData, headers={"x-csrf-token":f"{csrf}"})
+        res = s_devlog.post(f"{PROJECT_PREFIX}{PROJECT_ID}/devlogs",data=content, files={"devlog[file]": fileTuple}, headers={"x-csrf-token":f"{csrf}"})
     
     return res
 
@@ -117,14 +128,9 @@ if __name__ == "__main__":
     #with open(logPath) as file:
         #logText = file.read()
     #prep_req(authenticity, devlogText=f"{logText}")
-    prep_req(authenticity)
+    prep_req(authenticity,imagePath,devText)
     #print(requestContent[:200])
     print("=== devlog_post ===")
     print(FORM_ENTRIES)
     resp = devlog_post(csrf=csrfToken,content=FORM_ENTRIES)
-    print("=== response ===")
-    print(f"content: {resp.content}")
-    print(resp.text)
-    print(f"repr {repr(resp.content)}")
     print(resp.status_code)
-    print(resp.headers)

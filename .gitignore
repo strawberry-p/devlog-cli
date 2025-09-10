@@ -1,7 +1,9 @@
 session.json
 csrf_token.png
+argparse1.png
+devlog.txt
 multipart_constructed.png
 __pycache__/
 build/
 *.spec
-_internal /
+_internal/
