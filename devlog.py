@@ -110,7 +110,7 @@ def devlog_post(csrf=csrfToken,content=FORM_ENTRIES):
     #postData = {"mimeType": f"multipart/form-data; boundary={FORM_BOUNDARY}",
     #            "params":[],
     #            "text": content}
-    if (imageExt) and (imageExt != ""):
+    if (imageExt) and (imageExt != "") and (imageExt != "mp4"):
         fileTuple = (imageName,imageFile,f"image/{imageExt}")
     else:
         fileTuple = (imageName,imageFile)
