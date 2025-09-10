@@ -6,4 +6,5 @@ multipart_constructed.png
 __pycache__/
 build/
 *.spec
+*.png
 _internal/

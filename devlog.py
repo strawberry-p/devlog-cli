@@ -17,14 +17,22 @@ parser.add_argument("-d","--devlog-file",default=False,help="path to text file t
 parser.add_argument("-k","--keep-name",action="store_true",help="do not rename devlog image")
 args = parser.parse_args()
 PROJECT_ID = args.PROJECT_ID
-imagePath = args.imagePath
+if not os.path.isfile("session.json"):
+    print("\r\n! you do not have a session.json file, please check the README for the instructions to include your SoM cookies !\r\n")
+    raise Exception
+
+
+with open("session.json") as session_file:
+    try:
+        session_cookies = json.load(session_file)
+    except json.JSONDecodeError as _:
+        print("\r\n! malformed JSON, make sure session.json is valid JSON !\r\n")
+        raise _
 if not args.devlog_file:
-    devText = input("write a devlog")
+    devText = input("write a devlog\n")
 else:
     with open(args.devlog_file,"rt") as file:
         devText = file.read()
-with open("session.json") as session_file:
-    session_cookies = json.load(session_file)
 if True:
     cookie = ""
     for key,value in session_cookies.items():
