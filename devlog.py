@@ -136,7 +136,7 @@ if __name__ == "__main__":
     #with open(logPath) as file:
         #logText = file.read()
     #prep_req(authenticity, devlogText=f"{logText}")
-    prep_req(authenticity,imagePath,devText)
+    prep_req(authenticity,args.imagePath,devText)
     #print(requestContent[:200])
     print("=== devlog_post ===")
     print(FORM_ENTRIES)
